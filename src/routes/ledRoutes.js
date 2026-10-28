@@ -1,19 +1,30 @@
+
 import express from "express";
 
 const router = express.Router();
-const LED_KEY = "classroom:ledCommands";
 
 const DEFAULT_STATE = {
-  led1: false,
-  led2: false,
+  temperature: null,
+  humidity: null,
+  motionDetected: false,
+  lightLevel: null,
+  gasLevel: null,
+  gasAlert: false,
+  leds: {
+    led1: false,
+    led2: false,
+    led3: false,
+    led4: false,
+    led5: false,
+    alertLed: false,
+  },
 };
 
 function getRedis() {
   return globalThis.classroomRedisClient;
 }
 
-// Frontend: GET /api/leds/commands
-// ESP32:    GET /api/leds/commands
+// GET /api/leds/commands
 router.get("/commands", async (req, res) => {
   try {
     const redis = getRedis();
@@ -25,12 +36,16 @@ router.get("/commands", async (req, res) => {
       });
     }
 
-    const saved = await redis.get(LED_KEY);
-    const state = saved
-      ? { ...DEFAULT_STATE, ...JSON.parse(saved) }
-      : DEFAULT_STATE;
+    const saved = await redis.get("classroom:state");
+    const classroom = saved ? JSON.parse(saved) : DEFAULT_STATE;
 
-    res.json({ success: true, data: state });
+    res.json({
+      success: true,
+      data: {
+        led1: Boolean(classroom.leds?.led1),
+        led2: Boolean(classroom.leds?.led2),
+      },
+    });
   } catch (error) {
     console.error("Failed to read LED state:", error.message);
     res.status(500).json({
@@ -40,7 +55,7 @@ router.get("/commands", async (req, res) => {
   }
 });
 
-// Frontend: POST /api/leds/commands
+// POST /api/leds/commands
 router.post("/commands", async (req, res) => {
   try {
     const { led, state } = req.body || {};
@@ -62,21 +77,30 @@ router.post("/commands", async (req, res) => {
       });
     }
 
-    const saved = await redis.get(LED_KEY);
-    const current = saved
-      ? { ...DEFAULT_STATE, ...JSON.parse(saved) }
-      : { ...DEFAULT_STATE };
+    const saved = await redis.get("classroom:state");
+    const classroom = saved
+      ? JSON.parse(saved)
+      : { ...DEFAULT_STATE, leds: { ...DEFAULT_STATE.leds } };
 
-    current[led] = state;
+    classroom.leds = {
+      ...DEFAULT_STATE.leds,
+      ...(classroom.leds || {}),
+      [led]: state,
+    };
 
-    await redis.set(LED_KEY, JSON.stringify(current));
+    classroom.updatedAt = new Date().toISOString();
+
+    await redis.set("classroom:state", JSON.stringify(classroom));
 
     console.log(`${led} set to ${state ? "ON" : "OFF"}`);
 
     res.json({
       success: true,
       message: `${led} updated`,
-      data: current,
+      data: {
+        led1: Boolean(classroom.leds.led1),
+        led2: Boolean(classroom.leds.led2),
+      },
     });
   } catch (error) {
     console.error("Failed to update LED state:", error.message);

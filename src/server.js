@@ -61,6 +61,7 @@ io.on("connection", (socket) => {
 
 // Start databases first, then the classroom service and server.
 async function startServer() {
+  globalThis.classroomIO = io;
   try {
     const { redisClient } = await connectDatabases();
     globalThis.classroomRedisClient = redisClient;

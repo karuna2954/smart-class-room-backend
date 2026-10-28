@@ -52,4 +52,50 @@ router.get("/history", async (req, res) => {
   }
 });
 
+import { updateSensorReading } from "../services/classroomService.js";
+
+// POST /api/sensors/ingest
+router.post("/ingest", async (req, res) => {
+  try {
+    const {
+      temperature,
+      humidity,
+      motionDetected,
+      lightLevel,
+      gasLevel,
+      gasAlert,
+    } = req.body || {};
+
+    const redis = globalThis.classroomRedisClient;
+
+    if (!redis) {
+      return res.status(503).json({
+        success: false,
+        message: "Redis is unavailable",
+      });
+    }
+
+    const result = await updateSensorReading({
+      temperature,
+      humidity,
+      motionDetected,
+      lightLevel,
+      gasLevel,
+      gasAlert,
+    });
+
+    res.json({
+      success: true,
+      message: "Sensor data received",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Sensor ingestion failed:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Unable to ingest sensor data",
+    });
+  }
+});
+
 export default router;

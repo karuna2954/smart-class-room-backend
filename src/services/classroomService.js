@@ -170,3 +170,52 @@ export async function getCurrentClassroomState() {
 
   return JSON.parse(cached);
 }
+
+export async function updateSensorReading(reading) {
+  const redis = globalThis.classroomRedisClient;
+
+  if (!redis) {
+    throw new Error("Redis client is not initialized.");
+  }
+
+  const cached = await redis.get("classroom:state");
+  const current = cached
+    ? JSON.parse(cached)
+    : { ...classroomState, leds: { ...classroomState.leds } };
+
+  for (const key of [
+    "temperature",
+    "humidity",
+    "motionDetected",
+    "lightLevel",
+    "gasLevel",
+    "gasAlert",
+  ]) {
+    if (reading[key] !== undefined && reading[key] !== null) {
+      current[key] = reading[key];
+    }
+  }
+
+  current.updatedAt = new Date().toISOString();
+
+  await redis.set("classroom:state", JSON.stringify(current));
+
+  Object.assign(classroomState, current);
+
+  if (globalThis.classroomIO) {
+    globalThis.classroomIO.emit("classroom:state", current);
+    globalThis.classroomIO.emit("sensor:update", current);
+  }
+
+  await SensorReading.create({
+    temperature: current.temperature,
+    humidity: current.humidity,
+    motionDetected: current.motionDetected,
+    lightLevel: current.lightLevel,
+    gasLevel: current.gasLevel,
+    gasAlert: current.gasAlert,
+    leds: current.leds,
+  });
+
+  return current;
+}
