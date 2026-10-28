@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import sensorRoutes from "./routes/sensorRoutes.js";
 import { connectDatabases } from "./config/db.js";
 import { startClassroomService } from "./services/classroomService.js";
-
+import ledRoutes from "./routes/ledRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -17,8 +17,10 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors({ origin: "*" }));
 app.use(express.json());
-app.use("/api/sensors", sensorRoutes);
+// app.use("/api/sensors", sensorRoutes);
 // Socket.IO server
+app.use("/api/sensors", sensorRoutes);
+app.use("/api/leds", ledRoutes);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
